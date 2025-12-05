@@ -18,7 +18,7 @@ namespace ItemBlacklist
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.0";
+        public const string VERSION = "1.0.1";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, AmmonomiconPokedexEntry> ammonomiconDictionary = new Dictionary<string, AmmonomiconPokedexEntry>();
@@ -62,8 +62,20 @@ namespace ItemBlacklist
             List<WeightedGameObject> itemWeights = GameManager.Instance?.RewardManager?.ItemsLootTable?.defaultItemDrops?.elements;
 
             yield return null;
-            List<AmmonomiconPokedexEntry> gunAmmonomicons = AmmonomiconController.Instance?.m_extantPageMap?[AmmonomiconPageRenderer.PageType.GUNS_LEFT]?.m_pokedexEntries;
-            List<AmmonomiconPokedexEntry> itemAmmonomicons = AmmonomiconController.Instance?.m_extantPageMap?[AmmonomiconPageRenderer.PageType.ITEMS_LEFT]?.m_pokedexEntries;
+            yield return null;
+            AmmonomiconController.EnsureExistence();
+            yield return null;
+            yield return null;
+            while (AmmonomiconController.Instance?.m_extantPageMap == null)
+            {
+                yield return null;
+            }
+            while (!AmmonomiconController.Instance.m_extantPageMap.ContainsKey(AmmonomiconPageRenderer.PageType.GUNS_LEFT) || !AmmonomiconController.Instance.m_extantPageMap.ContainsKey(AmmonomiconPageRenderer.PageType.ITEMS_LEFT))
+            {
+                yield return null;
+            }
+            List<AmmonomiconPokedexEntry> gunAmmonomicons = AmmonomiconController.Instance.m_extantPageMap[AmmonomiconPageRenderer.PageType.GUNS_LEFT]?.m_pokedexEntries;
+            List<AmmonomiconPokedexEntry> itemAmmonomicons = AmmonomiconController.Instance.m_extantPageMap[AmmonomiconPageRenderer.PageType.ITEMS_LEFT]?.m_pokedexEntries;
             if (gunWeights == null || itemWeights == null || gunAmmonomicons == null || itemAmmonomicons == null)
                 yield break;
 

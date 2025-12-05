@@ -41,7 +41,7 @@ namespace ItemBlacklist
                 if (blacklist.Contains(guid))
                 {
                     blacklist.Remove(guid);
-                    Color color = dfSlicedSprite.Color;
+                    Color32 color = dfSlicedSprite.Color;
                     color.g = 255;
                     color.b = 255;
                     dfSlicedSprite.Color = color;
