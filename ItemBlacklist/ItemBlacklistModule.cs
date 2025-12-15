@@ -18,7 +18,7 @@ namespace ItemBlacklist
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.1";
+        public const string VERSION = "1.0.2";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, AmmonomiconPokedexEntry> ammonomiconDictionary = new Dictionary<string, AmmonomiconPokedexEntry>();
@@ -28,6 +28,8 @@ namespace ItemBlacklist
 
         internal HashSet<string> blacklist = new HashSet<string>();
         internal const string BLACKLIST_PATH = "blacklist.json";
+
+        internal const string FINISHED_GUN_GUID = "90ff5de1e6af41d1baa820c6c0fc7647";
 
         public void Start()
         {
@@ -85,6 +87,11 @@ namespace ItemBlacklist
                 if (pickupObject != null)
                 {
                     weightIDDictionary[pickupObject.PickupObjectId] = weight;
+                    string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
+                    if (string.IsNullOrEmpty(guid))
+                        continue;
+                    weightDictionary[guid] = weight;
+                    weightValueDictionary[guid] = weight.weight;
                 }
             }
             foreach (var weight in itemWeights)
@@ -93,6 +100,11 @@ namespace ItemBlacklist
                 if (pickupObject != null)
                 {
                     weightIDDictionary[pickupObject.PickupObjectId] = weight;
+                    string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
+                    if (string.IsNullOrEmpty(guid))
+                        continue;
+                    weightDictionary[guid] = weight;
+                    weightValueDictionary[guid] = weight.weight;
                 }
             }
             foreach (var entry in gunAmmonomicons)
