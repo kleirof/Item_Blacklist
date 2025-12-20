@@ -27,7 +27,7 @@ namespace ItemBlacklist
         internal static ItemBlacklistModule instance;
 
         internal HashSet<string> blacklist = new HashSet<string>();
-        internal const string BLACKLIST_PATH = "blacklist.json";
+        internal const string BLACKLIST_PATH = "blacklist_save.bl";
 
         internal const string FINISHED_GUN_GUID = "90ff5de1e6af41d1baa820c6c0fc7647";
 
@@ -221,7 +221,7 @@ namespace ItemBlacklist
         {
             try
             {
-                string filePath = Path.Combine(ETGMod.FolderPath(instance), BLACKLIST_PATH);
+                string filePath = Path.Combine(SaveManager.SavePath, BLACKLIST_PATH);
 
                 var oldSet = File.Exists(filePath)
                     ? new HashSet<string>(JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(filePath)) ?? new List<string>())
@@ -244,11 +244,11 @@ namespace ItemBlacklist
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
                 File.WriteAllText(filePath, JsonConvert.SerializeObject(newSet.ToList(), Formatting.Indented));
 
-                Debug.Log($"Blacklist保存：{newSet.Count} 项。 Blacklist save: {newSet.Count} items");
+                Debug.Log($"Blacklist共保存 {newSet.Count} 项，保存路径 {filePath}\nBlacklist saved {newSet.Count} items, save path {filePath}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Blacklist保存失败: {ex.Message}. Blacklist save failed: {ex.Message}");
+                Debug.LogError($"Blacklist保存失败: {ex.Message} Blacklist save failed: {ex.Message}");
             }
         }
 
@@ -256,11 +256,11 @@ namespace ItemBlacklist
         {
             try
             {
-                string filePath = Path.Combine(ETGMod.FolderPath(instance), BLACKLIST_PATH);
+                string filePath = Path.Combine(SaveManager.SavePath, BLACKLIST_PATH);
 
                 if (!File.Exists(filePath))
                 {
-                    Debug.Log("黑名单文件不存在。 Blacklist file does not exist");
+                    Debug.Log("黑名单文件不存在。 Blacklist file does not exist.");
                     blacklist.Clear();
                     return;
                 }
@@ -283,12 +283,12 @@ namespace ItemBlacklist
                         UpdateSavedEntry(entry);
                 }
 
-                Debug.Log($"Blacklist加载：文件中有 {fileList.Count} 项，加载了 {blacklist.Count} 项有效条目。 " +
-                         $"Blacklist load: {fileList.Count} in file, {blacklist.Count} valid items loaded");
+                Debug.Log($"Blacklist加载，文件中有 {fileList.Count} 项，加载了 {blacklist.Count} 项有效条目，加载路径 {filePath}\n" +
+                         $"Blacklist loaded, {fileList.Count} items in file, {blacklist.Count} valid items loaded, load path {filePath}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Blacklist加载失败: {ex.Message}. Blacklist load failed: {ex.Message}");
+                Debug.LogError($"Blacklist加载失败: {ex.Message} Blacklist load failed: {ex.Message}");
                 blacklist.Clear();
             }
         }
