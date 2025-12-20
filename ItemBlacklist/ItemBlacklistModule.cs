@@ -18,7 +18,7 @@ namespace ItemBlacklist
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.2";
+        public const string VERSION = "1.0.3";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, AmmonomiconPokedexEntry> ammonomiconDictionary = new Dictionary<string, AmmonomiconPokedexEntry>();
@@ -231,18 +231,8 @@ namespace ItemBlacklist
 
                 foreach (var guid in oldSet)
                 {
-                    if (string.IsNullOrEmpty(guid))
-                        continue;
-
-                    if (weightDictionary.ContainsKey(guid))
-                    {
-                        if (blacklist.Contains(guid))
-                            newSet.Add(guid);
-                    }
-                    else
-                    {
+                    if (!string.IsNullOrEmpty(guid) && !weightDictionary.ContainsKey(guid))
                         newSet.Add(guid);
-                    }
                 }
 
                 foreach (var guid in blacklist)

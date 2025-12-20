@@ -4,6 +4,7 @@ using MonoMod.Cil;
 using System.Reflection;
 using Mono.Cecil.Cil;
 using System;
+using System.Linq;
 
 namespace ItemBlacklist
 {
@@ -15,8 +16,18 @@ namespace ItemBlacklist
             iLCursor.Emit(OpCodes.Call, methodInfo);
         }
 
+        public static bool TheNthTime(this Func<bool> predict, int n = 1)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                if (!predict())
+                    return false;
+            }
+            return true;
+        }
+
         [HarmonyPatch(typeof(AmmonomiconPokedexEntry), nameof(AmmonomiconPokedexEntry.Awake))]
-        public static class AmmonomiconPokedexEntryAwakePatch
+        public class AmmonomiconPokedexEntryAwakePatch
         {
             [HarmonyPostfix]
             public static void AmmonomiconPokedexEntryAwakePostfix(AmmonomiconPokedexEntry __instance)
@@ -76,27 +87,87 @@ namespace ItemBlacklist
         }
 
         [HarmonyPatch(typeof(LootData), nameof(LootData.GetItemForPlayer))]
-        public static class LootDataGetItemForPlayerPatch
+        public class LootDataGetItemForPlayerPatchClass
         {
             [HarmonyPrefix]
             public static void LootDataGetItemForPlayerPrefix()
             {
                 ItemBlacklistModule.instance?.SetWeightsToZero();
             }
+
+            [HarmonyILManipulator]
+            public static void LootDataGetItemForPlayerPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (((Func<bool>)(() =>
+                    crs.TryGotoNext(MoveType.After,
+                    x => x.MatchCall<UnityEngine.Object>("op_Inequality")
+                    ))).TheNthTime(3))
+                {
+                    crs.Emit(OpCodes.Ldloc_S, (byte)11);
+                    crs.EmitCall<LootDataGetItemForPlayerPatchClass>(nameof(LootDataGetItemForPlayerPatchClass.LootDataGetItemForPlayerPatchCall));
+                }
+            }
+
+            private static bool LootDataGetItemForPlayerPatchCall(bool orig, PickupObject pickupObject)
+            {
+                if (pickupObject == null)
+                    return orig;
+                string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
+                if (string.IsNullOrEmpty(guid))
+                    return orig;
+                var blacklist = ItemBlacklistModule.instance?.blacklist;
+                if (blacklist == null)
+                    return orig;
+                if (blacklist.Contains(guid))
+                    return false;
+                return orig;
+            }
         }
 
         [HarmonyPatch(typeof(RewardManager), nameof(RewardManager.GetItemForPlayer))]
-        public static class RewardManagerGetItemForPlayerPatch
+        public class RewardManagerGetItemForPlayerPatchClass
         {
             [HarmonyPrefix]
             public static void RewardManagerGetItemForPlayerPrefix()
             {
                 ItemBlacklistModule.instance?.SetWeightsToZero();
             }
+
+            [HarmonyILManipulator]
+            public static void RewardManagerGetItemForPlayerPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (((Func<bool>)(() =>
+                    crs.TryGotoNext(MoveType.After,
+                    x => x.MatchCall<UnityEngine.Object>("op_Inequality")
+                    ))).TheNthTime(2))
+                {
+                    crs.Emit(OpCodes.Ldloc_S, (byte)7);
+                    crs.EmitCall<RewardManagerGetItemForPlayerPatchClass>(nameof(RewardManagerGetItemForPlayerPatchClass.RewardManagerGetItemForPlayerPatchCall));
+                }
+            }
+
+            private static bool RewardManagerGetItemForPlayerPatchCall(bool orig, PickupObject pickupObject)
+            {
+                if (pickupObject == null)
+                    return orig;
+                string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
+                if (string.IsNullOrEmpty(guid))
+                    return orig;
+                var blacklist = ItemBlacklistModule.instance?.blacklist;
+                if (blacklist == null)
+                    return orig;
+                if (blacklist.Contains(guid))
+                    return false;
+                return orig;
+            }
         }
 
         [HarmonyPatch(typeof(AmmonomiconController), nameof(AmmonomiconController.CloseAmmonomicon))]
-        public static class CloseAmmonomiconPatch
+        public class CloseAmmonomiconPatch
         {
             [HarmonyPostfix]
             public static void CloseAmmonomiconPostfix()
