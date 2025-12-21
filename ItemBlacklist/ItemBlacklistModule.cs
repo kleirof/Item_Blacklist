@@ -18,18 +18,22 @@ namespace ItemBlacklist
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.3";
+        public const string VERSION = "1.0.4";
         public const string TEXT_COLOR = "#AD8CFE";
 
-        internal Dictionary<string, AmmonomiconPokedexEntry> ammonomiconDictionary = new Dictionary<string, AmmonomiconPokedexEntry>();
-        internal Dictionary<string, WeightedGameObject> weightDictionary = new Dictionary<string, WeightedGameObject>();
-        internal Dictionary<string, float> weightValueDictionary = new Dictionary<string, float>();
+        internal Dictionary<string, WeakBag<AmmonomiconPokedexEntry>> ammonomiconDictionary = new Dictionary<string, WeakBag<AmmonomiconPokedexEntry>>();
         internal static ItemBlacklistModule instance;
 
         internal HashSet<string> blacklist = new HashSet<string>();
         internal const string BLACKLIST_PATH = "blacklist_save.bl";
 
         internal const string FINISHED_GUN_GUID = "90ff5de1e6af41d1baa820c6c0fc7647";
+
+        internal Dictionary<string, WeakBag<WeightedGameObject>> weightGroups = new Dictionary<string, WeakBag<WeightedGameObject>>();
+        internal WeakStrongDictionary<WeightedGameObject, float> oldWeights = new WeakStrongDictionary<WeightedGameObject, float>();
+        internal HashSet<string> mainGuidSets = new HashSet<string>();
+
+        internal HashSet<int> extraPages = new HashSet<int>();
 
         public void Start()
         {
@@ -53,13 +57,33 @@ namespace ItemBlacklist
             ETGModConsole.Log($"<color={color}>{text}</color>");
         }
 
+        internal void AddToWeightedGameObjectGroup(string groupId, WeightedGameObject weighted)
+        {
+            if (!weightGroups.TryGetValue(groupId, out var bag))
+            {
+                bag = new WeakBag<WeightedGameObject>(4);
+                weightGroups[groupId] = bag;
+            }
+            bag.Add(weighted);
+            mainGuidSets.Add(groupId);
+        }
+
+        internal void AddToAmmonomiconPokedexEntryGroup(string groupId, AmmonomiconPokedexEntry pokedexEntry)
+        {
+            if (!ammonomiconDictionary.TryGetValue(groupId, out var bag))
+            {
+                bag = new WeakBag<AmmonomiconPokedexEntry>(4);
+                ammonomiconDictionary[groupId] = bag;
+            }
+            bag.Add(pokedexEntry);
+        }
+
         private IEnumerator DelayInitialize()
         {
             yield return null;
             yield return null;
             yield return null;
 
-            Dictionary<int, WeightedGameObject> weightIDDictionary = new Dictionary<int, WeightedGameObject>();
             List<WeightedGameObject> gunWeights = GameManager.Instance?.RewardManager?.GunsLootTable?.defaultItemDrops?.elements;
             List<WeightedGameObject> itemWeights = GameManager.Instance?.RewardManager?.ItemsLootTable?.defaultItemDrops?.elements;
 
@@ -81,55 +105,42 @@ namespace ItemBlacklist
             if (gunWeights == null || itemWeights == null || gunAmmonomicons == null || itemAmmonomicons == null)
                 yield break;
 
-            foreach (var weight in gunWeights)
+            var genericLoots = Resources.FindObjectsOfTypeAll<GenericLootTable>()
+                                .Where(obj => obj != null && obj.GetInstanceID() != 0)
+                                .ToArray();
+
+            foreach (var lootTable in genericLoots)
             {
-                PickupObject pickupObject = weight?.gameObject?.GetComponent<PickupObject>();
-                if (pickupObject != null)
+                var elements = lootTable?.defaultItemDrops?.elements;
+                if (elements == null)
+                    continue;
+                foreach (var weight in elements)
                 {
-                    weightIDDictionary[pickupObject.PickupObjectId] = weight;
-                    string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
-                    if (string.IsNullOrEmpty(guid))
-                        continue;
-                    weightDictionary[guid] = weight;
-                    weightValueDictionary[guid] = weight.weight;
-                }
-            }
-            foreach (var weight in itemWeights)
-            {
-                PickupObject pickupObject = weight?.gameObject?.GetComponent<PickupObject>();
-                if (pickupObject != null)
-                {
-                    weightIDDictionary[pickupObject.PickupObjectId] = weight;
-                    string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
-                    if (string.IsNullOrEmpty(guid))
-                        continue;
-                    weightDictionary[guid] = weight;
-                    weightValueDictionary[guid] = weight.weight;
+                    PickupObject pickupObject = weight?.gameObject?.GetComponent<PickupObject>();
+                    if (pickupObject != null)
+                    {
+                        string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
+                        if (string.IsNullOrEmpty(guid))
+                            continue;
+                        oldWeights[weight] = weight.weight;
+                        AddToWeightedGameObjectGroup(guid, weight);
+                    }
                 }
             }
             foreach (var entry in gunAmmonomicons)
             {
-                if (!string.IsNullOrEmpty(entry?.linkedEncounterTrackable?.myGuid) && weightIDDictionary.ContainsKey(entry.linkedEncounterTrackable.pickupObjectId))
+                var guid = entry?.linkedEncounterTrackable?.myGuid;
+                if (!string.IsNullOrEmpty(guid) && mainGuidSets.Contains(guid))
                 {
-                    ammonomiconDictionary[entry.linkedEncounterTrackable.myGuid] = entry;
+                    AddToAmmonomiconPokedexEntryGroup(guid, entry);
                 }
             }
             foreach (var entry in itemAmmonomicons)
             {
-                if (!string.IsNullOrEmpty(entry?.linkedEncounterTrackable?.myGuid) && weightIDDictionary.ContainsKey(entry.linkedEncounterTrackable.pickupObjectId))
+                var guid = entry?.linkedEncounterTrackable?.myGuid;
+                if (!string.IsNullOrEmpty(guid) && mainGuidSets.Contains(guid))
                 {
-                    ammonomiconDictionary[entry.linkedEncounterTrackable.myGuid] = entry;
-                }
-            }
-            foreach (var entry in ammonomiconDictionary)
-            {
-                if (!string.IsNullOrEmpty(entry.Key) && entry.Value != null)
-                {
-                    if (entry.Value.linkedEncounterTrackable != null && weightIDDictionary.TryGetValue(entry.Value.linkedEncounterTrackable.pickupObjectId, out var weighted))
-                    {
-                        weightDictionary[entry.Key] = weighted;
-                        weightValueDictionary[entry.Key] = weighted.weight;
-                    }
+                    AddToAmmonomiconPokedexEntryGroup(guid, entry);
                 }
             }
 
@@ -138,6 +149,8 @@ namespace ItemBlacklist
 #if DEBUG_MODE
             DebugSetAll();
 #endif
+
+            SetAllWeightsToZero();
 
             yield break;
         }
@@ -159,42 +172,42 @@ namespace ItemBlacklist
         {
             if (string.IsNullOrEmpty(guid))
                 return;
-            if (!weightDictionary.TryGetValue(guid, out var weightedGameObject))
+            if (!weightGroups.TryGetValue(guid, out var groups))
                 return;
-            if (!weightValueDictionary.TryGetValue(guid, out var value))
-                return;
-            weightedGameObject.weight = value;
-        }
-
-        internal void StoreWeight(string guid)
-        {
-            if (string.IsNullOrEmpty(guid))
-                return;
-            if (!weightDictionary.TryGetValue(guid, out var weightedGameObject))
-                return;
-            if (weightedGameObject == null)
-                return;
-            if (weightedGameObject.weight <= Mathf.Epsilon)
-                return;
-            weightValueDictionary[guid] = weightedGameObject.weight;
-        }
-
-        internal void SetWeightsToZero()
-        {
-            foreach (string guid in blacklist)
+            foreach (var weightedGameObject in groups)
             {
-                if (string.IsNullOrEmpty(guid))
-                    continue;
-                if (!weightDictionary.TryGetValue(guid, out var weighted))
-                    continue;
-                if (weighted == null)
-                    continue;
-                StoreWeight(guid);
-                weighted.weight = 0f;
+                if (!oldWeights.TryGetValue(weightedGameObject, out var value))
+                    return;
+                weightedGameObject.weight = value;
             }
         }
 
-        private void UpdateSavedEntry(AmmonomiconPokedexEntry ammonomiconEntry)
+        internal void SetAllWeightsToZero()
+        {
+            foreach (string guid in blacklist)
+            {
+                SetWeightToZero(guid);
+            }
+        }
+
+        internal void SetWeightToZero(string guid)
+        {
+            if (string.IsNullOrEmpty(guid))
+                return;
+            if (!weightGroups.TryGetValue(guid, out var groups))
+                return;
+            foreach (var weightedGameObject in groups)
+            {
+                if (weightedGameObject == null)
+                    continue;
+                if (weightedGameObject.weight <= Mathf.Epsilon)
+                    continue;
+                oldWeights[weightedGameObject] = weightedGameObject.weight;
+                weightedGameObject.weight = 0f;
+            }
+        }
+
+        internal void UpdateSavedEntry(string guid, AmmonomiconPokedexEntry ammonomiconEntry)
         {
             if (ammonomiconEntry == null)
                 return;
@@ -209,6 +222,8 @@ namespace ItemBlacklist
                 return;
             dfSlicedSprite dfSlicedSprite = ammonomiconEntry?.transform?.Find("Sliced Sprite")?.GetComponent<dfSlicedSprite>();
             if (dfSlicedSprite == null || blacklist == null)
+                return;
+            if (!blacklist.Contains(guid))
                 return;
 
             Color32 color = dfSlicedSprite.Color;
@@ -231,13 +246,13 @@ namespace ItemBlacklist
 
                 foreach (var guid in oldSet)
                 {
-                    if (!string.IsNullOrEmpty(guid) && !weightDictionary.ContainsKey(guid))
+                    if (!string.IsNullOrEmpty(guid) && !mainGuidSets.Contains(guid))
                         newSet.Add(guid);
                 }
 
                 foreach (var guid in blacklist)
                 {
-                    if (!string.IsNullOrEmpty(guid) && weightDictionary.ContainsKey(guid))
+                    if (!string.IsNullOrEmpty(guid) && mainGuidSets.Contains(guid))
                         newSet.Add(guid);
                 }
 
@@ -271,7 +286,7 @@ namespace ItemBlacklist
                 blacklist.Clear();
                 foreach (var guid in fileList)
                 {
-                    if (!string.IsNullOrEmpty(guid) && weightDictionary.ContainsKey(guid))
+                    if (!string.IsNullOrEmpty(guid) && mainGuidSets.Contains(guid))
                     {
                         blacklist.Add(guid);
                     }
@@ -279,8 +294,10 @@ namespace ItemBlacklist
 
                 foreach (var item in blacklist)
                 {
-                    if (ammonomiconDictionary.TryGetValue(item, out var entry))
-                        UpdateSavedEntry(entry);
+                    if (!ammonomiconDictionary.TryGetValue(item, out var group))
+                        continue;
+                    foreach (var ammonomicon in group)
+                        UpdateSavedEntry(item, ammonomicon);
                 }
 
                 Debug.Log($"Blacklist加载，文件中有 {fileList.Count} 项，加载了 {blacklist.Count} 项有效条目，加载路径 {filePath}\n" +

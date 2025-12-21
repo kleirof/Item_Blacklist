@@ -241,6 +241,8 @@
     <Compile Include="ItemBlacklistPatches.cs" />
     <Compile Include="ItemBlacklistModule.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="WeakBag.cs" />
+    <Compile Include="WeakStrongDictionary.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

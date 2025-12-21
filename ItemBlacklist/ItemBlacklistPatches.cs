@@ -4,12 +4,15 @@ using MonoMod.Cil;
 using System.Reflection;
 using Mono.Cecil.Cil;
 using System;
-using System.Linq;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace ItemBlacklist
 {
     public static class ItemBlacklistPatches
     {
+        private static EncounterTrackable cachedTargetTrackable;
+
         public static void EmitCall<T>(this ILCursor iLCursor, string methodName, Type[] parameters = null, Type[] generics = null)
         {
             MethodInfo methodInfo = AccessTools.Method(typeof(T), methodName, parameters, generics);
@@ -24,6 +27,77 @@ namespace ItemBlacklist
                     return false;
             }
             return true;
+        }
+
+        [HarmonyPatch(typeof(AmmonomiconController), nameof(AmmonomiconController.HandleTurnToNextPage), MethodType.Enumerator)]
+        public class HandleTurnToNextPagePatch
+        {
+            [HarmonyPostfix]
+            public static void HandleTurnToNextPagePostfix(ref bool __result)
+            {
+                if (!__result && cachedTargetTrackable != null)
+                {
+                    AmmonomiconPokedexEntry pokedexEntry = AmmonomiconController.Instance?.CurrentLeftPageRenderer?
+                        .GetPokedexEntry(cachedTargetTrackable);
+
+                    if (pokedexEntry != null)
+                    {
+                        pokedexEntry.ForceFocus();
+                        AmmonomiconController.Instance.StartCoroutine(FlashPokedexEntry(pokedexEntry));
+                        cachedTargetTrackable = null;
+                    }
+                }
+            }
+
+            private static void SetEntryColor(HashSet<string> blacklist, string guid, ref Color32 color)
+            {
+                if (!blacklist.Contains(guid))
+                {
+                    color.g = 255;
+                    color.b = 255;
+                }
+                else
+                {
+                    color.g = 153;
+                    color.b = 153;
+                }
+            }
+
+            private static IEnumerator FlashPokedexEntry(AmmonomiconPokedexEntry pokedexEntry)
+            {
+                if (pokedexEntry == null) 
+                    yield break;
+
+                dfSlicedSprite dfSlicedSprite = pokedexEntry?.transform?.Find("Sliced Sprite")?.GetComponent<dfSlicedSprite>();
+                if (dfSlicedSprite == null) 
+                    yield break;
+
+                var databaseEntry = pokedexEntry.linkedEncounterTrackable;
+                var blacklist = ItemBlacklistModule.instance?.blacklist;
+                if (databaseEntry == null || blacklist == null)
+                    yield break;
+                string guid = databaseEntry.myGuid;
+                if (string.IsNullOrEmpty(guid))
+                    yield break;
+
+                Color32 normalColor = dfSlicedSprite.Color;
+                Color32 flashColor = new Color32(254, 224, 0, 255);
+
+                int flashCount = 5;
+                float flashDuration = 0.15f;
+
+                for (int i = 0; i < flashCount; i++)
+                {
+                    dfSlicedSprite.Color = flashColor;
+                    yield return new WaitForSecondsRealtime(flashDuration);
+                    SetEntryColor(blacklist, guid, ref normalColor);
+                    dfSlicedSprite.Color = normalColor;
+                    yield return new WaitForSecondsRealtime(flashDuration);
+                }
+
+                SetEntryColor(blacklist, guid, ref normalColor);
+                dfSlicedSprite.Color = normalColor;
+            }
         }
 
         [HarmonyPatch(typeof(AmmonomiconPokedexEntry), nameof(AmmonomiconPokedexEntry.Awake))]
@@ -45,43 +119,74 @@ namespace ItemBlacklist
                     return;
                 if (ammonomiconEntry.encounterState != AmmonomiconPokedexEntry.EncounterState.ENCOUNTERED)
                     return;
-                if (ammonomiconEntry.IsEquipmentPage)
-                    return;
-                EncounterDatabaseEntry databaseEntry = ammonomiconEntry.linkedEncounterTrackable;
+
+                var databaseEntry = ammonomiconEntry.linkedEncounterTrackable;
                 if (databaseEntry == null)
                     return;
                 if (databaseEntry.pickupObjectId == -1)
                     return;
                 string guid = databaseEntry.myGuid;
-                var blacklist = ItemBlacklistModule.instance?.blacklist;
                 var ammonomicon = ItemBlacklistModule.instance?.ammonomiconDictionary;
-                dfSlicedSprite dfSlicedSprite = ammonomiconEntry?.transform?.Find("Sliced Sprite")?.GetComponent<dfSlicedSprite>();
-                if (string.IsNullOrEmpty(guid) || dfSlicedSprite == null || blacklist == null || ammonomicon == null)
+                if (string.IsNullOrEmpty(guid) || ammonomicon == null)
                     return;
 
-                if (blacklist.Contains(guid))
+                if (!ammonomiconEntry.IsEquipmentPage)
                 {
-                    blacklist.Remove(guid);
-                    Color32 color = dfSlicedSprite.Color;
-                    color.g = 255;
-                    color.b = 255;
-                    dfSlicedSprite.Color = color;
-                    ItemBlacklistModule.instance.RollbackWeight(guid);
-                    if (ammonomiconEntry.m_button != null && ammonomiconEntry.m_button.HasFocus)
-                        AkSoundEngine.PostEvent("Play_UI_menu_select_01", GameManager.Instance.gameObject);
+
+                    var blacklist = ItemBlacklistModule.instance?.blacklist;
+                    var dfSlicedSprite = ammonomiconEntry?.transform?.Find("Sliced Sprite")?.GetComponent<dfSlicedSprite>();
+                    if (dfSlicedSprite == null || blacklist == null)
+                        return;
+
+                    if (blacklist.Contains(guid))
+                    {
+                        blacklist.Remove(guid);
+                        Color32 color = dfSlicedSprite.Color;
+                        color.g = 255;
+                        color.b = 255;
+                        dfSlicedSprite.Color = color;
+                        ItemBlacklistModule.instance.RollbackWeight(guid);
+                        if (ammonomiconEntry.m_button != null && ammonomiconEntry.m_button.HasFocus && GameManager.HasInstance)
+                            AkSoundEngine.PostEvent("Play_UI_menu_select_01", GameManager.Instance.gameObject);
+                    }
+                    else
+                    {
+                        if (ammonomicon.ContainsKey(guid))
+                        {
+                            blacklist.Add(guid);
+                            Color32 color = dfSlicedSprite.Color;
+                            color.g = 153;
+                            color.b = 153;
+                            dfSlicedSprite.Color = color;
+                            ItemBlacklistModule.instance.SetWeightToZero(guid);
+                            if (ammonomiconEntry.m_button != null && ammonomiconEntry.m_button.HasFocus && GameManager.HasInstance)
+                                AkSoundEngine.PostEvent("Play_UI_menu_select_01", GameManager.Instance.gameObject);
+                        }
+                    }
                 }
                 else
                 {
-                    if (ammonomicon.ContainsKey(guid))
-                    {
-                        blacklist.Add(guid);
-                        Color32 color = dfSlicedSprite.Color;
-                        color.g = 153;
-                        color.b = 153;
-                        dfSlicedSprite.Color = color;
-                        if (ammonomiconEntry.m_button != null && ammonomiconEntry.m_button.HasFocus)
-                            AkSoundEngine.PostEvent("Play_UI_menu_select_01", GameManager.Instance.gameObject);
-                    }
+                    var ammonomiconController = AmmonomiconController.HasInstance ? AmmonomiconController.Instance : null;
+                    if (ammonomiconController == null)
+                        return;
+                    if (!ammonomicon.ContainsKey(guid))
+                        return;
+                    var pickupObject = PickupObjectDatabase.GetById(databaseEntry.pickupObjectId);
+                    if (pickupObject == null)
+                        return;
+                    EncounterTrackable targetTrackable = pickupObject?.gameObject?.GetComponent<EncounterTrackable>();
+                    if (targetTrackable == null)
+                        return;
+                    cachedTargetTrackable = targetTrackable;
+                    var bookmarks = ammonomiconController.m_AmmonomiconInstance?.bookmarks;
+                    if (bookmarks == null)
+                        return;
+                    var index = pickupObject is Gun ? 1 : 2;
+                    if (index >= bookmarks.Length)
+                        return;
+                    bookmarks[index].IsCurrentPage = true;
+                    if (ammonomiconEntry.m_button != null && ammonomiconEntry.m_button.HasFocus && GameManager.HasInstance)
+                        AkSoundEngine.PostEvent("Play_UI_menu_select_01", GameManager.Instance.gameObject);
                 }
             }
         }
@@ -92,7 +197,7 @@ namespace ItemBlacklist
             [HarmonyPrefix]
             public static void LootDataGetItemForPlayerPrefix()
             {
-                ItemBlacklistModule.instance?.SetWeightsToZero();
+                ItemBlacklistModule.instance?.SetAllWeightsToZero();
             }
 
             [HarmonyILManipulator]
@@ -132,7 +237,7 @@ namespace ItemBlacklist
             [HarmonyPrefix]
             public static void RewardManagerGetItemForPlayerPrefix()
             {
-                ItemBlacklistModule.instance?.SetWeightsToZero();
+                ItemBlacklistModule.instance?.SetAllWeightsToZero();
             }
 
             [HarmonyILManipulator]
@@ -166,12 +271,54 @@ namespace ItemBlacklist
             }
         }
 
+        [HarmonyPatch(typeof(GunberMuncherController), nameof(GunberMuncherController.GetItemForPlayer))]
+        public class GunberMuncherControllerGetItemForPlayerPatchClass
+        {
+            [HarmonyPrefix]
+            public static void GunberMuncherControllerGetItemForPlayerPrefix()
+            {
+                ItemBlacklistModule.instance?.SetAllWeightsToZero();
+            }
+
+            [HarmonyILManipulator]
+            public static void GunberMuncherControllerGetItemForPlayerPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (((Func<bool>)(() =>
+                    crs.TryGotoNext(MoveType.After,
+                    x => x.MatchCall<UnityEngine.Object>("op_Inequality")
+                    ))).TheNthTime(5))
+                {
+                    crs.Emit(OpCodes.Ldloc_S, (byte)9);
+                    crs.EmitCall<GunberMuncherControllerGetItemForPlayerPatchClass>(nameof(GunberMuncherControllerGetItemForPlayerPatchClass.GunberMuncherControllerGetItemForPlayerPatchCall));
+                }
+            }
+
+            private static bool GunberMuncherControllerGetItemForPlayerPatchCall(bool orig, PickupObject pickupObject)
+            {
+                if (pickupObject == null)
+                    return orig;
+                string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
+                if (string.IsNullOrEmpty(guid))
+                    return orig;
+                var blacklist = ItemBlacklistModule.instance?.blacklist;
+                if (blacklist == null)
+                    return orig;
+                if (blacklist.Contains(guid))
+                    return false;
+                return orig;
+            }
+        }
+
         [HarmonyPatch(typeof(AmmonomiconController), nameof(AmmonomiconController.CloseAmmonomicon))]
         public class CloseAmmonomiconPatch
         {
             [HarmonyPostfix]
             public static void CloseAmmonomiconPostfix()
             {
+                cachedTargetTrackable = null;
+                ItemBlacklistModule.instance?.SetAllWeightsToZero();
                 ItemBlacklistModule.instance?.SaveBlacklist();
             }
         }
@@ -205,7 +352,6 @@ namespace ItemBlacklist
             }
         }
 
-
         [HarmonyPatch(typeof(LootEngine), nameof(LootEngine.SpawnItem))]
         public class SpawnItemPatchClass
         {
@@ -235,7 +381,6 @@ namespace ItemBlacklist
             }
         }
 
-
         [HarmonyPatch(typeof(LootData), nameof(LootData.GetItemsForPlayer))]
         public class GetItemsForPlayerPatchClass
         {
@@ -262,6 +407,33 @@ namespace ItemBlacklist
                 if (module.blacklist.Contains(ItemBlacklistModule.FINISHED_GUN_GUID))
                     return 1;
                 return orig;
+            }
+        }
+
+        [HarmonyPatch(typeof(AmmonomiconController), nameof(AmmonomiconController.LoadPageUIAtPath))]
+        public class LoadPageUIAtPathPatch
+        {
+            [HarmonyPostfix]
+            public static void LoadPageUIAtPathPostfix(AmmonomiconController __instance, AmmonomiconPageRenderer.PageType pageType)
+            {
+                if ((int)pageType <= (int)AmmonomiconPageRenderer.PageType.DEATH_RIGHT)
+                    return;
+                var extraPages = ItemBlacklistModule.instance?.extraPages;
+                var mainGuidSets = ItemBlacklistModule.instance?.mainGuidSets;
+                if (extraPages == null || mainGuidSets == null)
+                    return;
+                if (extraPages.Contains((int)pageType))
+                    return;
+                extraPages.Add((int)pageType);
+                foreach (var entry in __instance.m_extantPageMap?[pageType]?.m_pokedexEntries)
+                {
+                    var guid = entry?.linkedEncounterTrackable?.myGuid;
+                    if (string.IsNullOrEmpty(guid) || !mainGuidSets.Contains(guid))
+                        continue;
+
+                    ItemBlacklistModule.instance?.AddToAmmonomiconPokedexEntryGroup(guid, entry);
+                    ItemBlacklistModule.instance?.UpdateSavedEntry(guid, entry);
+                }
             }
         }
     }
