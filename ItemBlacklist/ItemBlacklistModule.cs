@@ -1,6 +1,7 @@
 ﻿//#define DEBUG_MODE
 
 using BepInEx;
+using BepInEx.Configuration;
 using HarmonyLib;
 using Newtonsoft.Json;
 using System;
@@ -18,26 +19,34 @@ namespace ItemBlacklist
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.4";
+        public const string VERSION = "1.0.5";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, WeakBag<AmmonomiconPokedexEntry>> ammonomiconDictionary = new Dictionary<string, WeakBag<AmmonomiconPokedexEntry>>();
         internal static ItemBlacklistModule instance;
 
         internal HashSet<string> blacklist = new HashSet<string>();
-        internal const string BLACKLIST_PATH = "blacklist_save.bl";
 
         internal const string FINISHED_GUN_GUID = "90ff5de1e6af41d1baa820c6c0fc7647";
 
         internal Dictionary<string, WeakBag<WeightedGameObject>> weightGroups = new Dictionary<string, WeakBag<WeightedGameObject>>();
         internal WeakStrongDictionary<WeightedGameObject, float> oldWeights = new WeakStrongDictionary<WeightedGameObject, float>();
         internal HashSet<string> mainGuidSets = new HashSet<string>();
-
         internal HashSet<int> extraPages = new HashSet<int>();
+
+        private ConfigEntry<string> savePath;
+        private string finalSavePath;
 
         public void Start()
         {
             instance = this;
+
+            savePath = Config.Bind(
+                "ItemBlacklist",
+                "SavePath",
+                "[@BepInExConfigPath@]/blacklist_save.bl",
+                "存档路径。支持以下变量：[@GameSavePath@] - 游戏存档目录；[@BepInExConfigPath@] - BepInEx配置目录；[@ModFolderPath@] - Mod所在目录。示例：[@BepInExConfigPath@]/blacklist_save.bl     Save path. The following variables are supported: [@GameSavePath@] - game save directory; [@BepInExConfigPath@] - BepInEx configuration directory; [@ModFolderPath@] - directory containing mods. Example: [@BepInExConfigPath@]/blacklist_save.bl"
+            );
 
             ETGModMainBehaviour.WaitForGameManagerStart(GMStart);
         }
@@ -49,7 +58,59 @@ namespace ItemBlacklist
             Harmony harmony = new Harmony(GUID);
             harmony.PatchAll();
 
+            finalSavePath = ResolveSavePath(savePath.Value);
+
             g.StartCoroutine(DelayInitialize());
+        }
+
+        private string ResolveSavePath(string pathWithVariables)
+        {
+            if (instance == null)
+                return GetDefaultPath();
+
+            if (string.IsNullOrEmpty(pathWithVariables))
+                return GetDefaultPath();
+
+            try
+            {
+                string resolved = pathWithVariables;
+
+                resolved = resolved.Replace("[@GameSavePath@]", SaveManager.SavePath ?? ".");
+                resolved = resolved.Replace("[@BepInExConfigPath@]", Paths.ConfigPath ?? ".");
+                resolved = resolved.Replace("[@ModFolderPath@]", ETGMod.FolderPath(instance) ?? ".");
+
+                string fullPath = Path.GetFullPath(resolved);
+
+                return ValidateResolvedPath(fullPath) ? fullPath : GetDefaultPath();
+            }
+            catch
+            {
+                return GetDefaultPath();
+            }
+        }
+
+        private static bool ValidateResolvedPath(string path)
+        {
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+
+                string dir = Path.GetDirectoryName(fullPath);
+                string file = Path.GetFileName(fullPath);
+
+                return !string.IsNullOrEmpty(dir) &&
+                       !string.IsNullOrEmpty(file) &&
+                       !file.Any(c => Path.GetInvalidFileNameChars().Contains(c));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string GetDefaultPath()
+        {
+            return Path.Combine(Paths.ConfigPath ?? ".", "blacklist_save.bl");
         }
 
         public static void Log(string text, string color = "FFFFFF")
@@ -236,7 +297,9 @@ namespace ItemBlacklist
         {
             try
             {
-                string filePath = Path.Combine(SaveManager.SavePath, BLACKLIST_PATH);
+                string filePath = finalSavePath;
+                if (string.IsNullOrEmpty(filePath))
+                    return;
 
                 var oldSet = File.Exists(filePath)
                     ? new HashSet<string>(JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(filePath)) ?? new List<string>())
@@ -271,7 +334,9 @@ namespace ItemBlacklist
         {
             try
             {
-                string filePath = Path.Combine(SaveManager.SavePath, BLACKLIST_PATH);
+                string filePath = finalSavePath;
+                if (string.IsNullOrEmpty(filePath))
+                    return;
 
                 if (!File.Exists(filePath))
                 {
