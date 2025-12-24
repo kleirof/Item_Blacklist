@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using Alexandria.ItemAPI;
 
 namespace ItemBlacklist
 {
@@ -19,7 +20,7 @@ namespace ItemBlacklist
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.5";
+        public const string VERSION = "1.0.6";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, WeakBag<AmmonomiconPokedexEntry>> ammonomiconDictionary = new Dictionary<string, WeakBag<AmmonomiconPokedexEntry>>();
@@ -153,6 +154,8 @@ namespace ItemBlacklist
             AmmonomiconController.EnsureExistence();
             yield return null;
             yield return null;
+
+            BanSpriteController.AddBanSpriteToCollection();
             while (AmmonomiconController.Instance?.m_extantPageMap == null)
             {
                 yield return null;

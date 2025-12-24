@@ -6,6 +6,7 @@ using Mono.Cecil.Cil;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ItemBlacklist
 {
@@ -17,6 +18,14 @@ namespace ItemBlacklist
         {
             MethodInfo methodInfo = AccessTools.Method(typeof(T), methodName, parameters, generics);
             iLCursor.Emit(OpCodes.Call, methodInfo);
+        }
+
+        public static T GetFieldInEnumerator<T>(object instance, string fieldNamePattern)
+        {
+            return (T)instance.GetType()
+                .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .FirstOrDefault(f => f.Name.Contains("$" + fieldNamePattern) || f.Name.Contains("<" + fieldNamePattern + ">") || f.Name == fieldNamePattern)
+                .GetValue(instance);
         }
 
         public static bool TheNthTime(this Func<bool> predict, int n = 1)
@@ -434,6 +443,24 @@ namespace ItemBlacklist
                     ItemBlacklistModule.instance?.AddToAmmonomiconPokedexEntryGroup(guid, entry);
                     ItemBlacklistModule.instance?.UpdateSavedEntry(guid, entry);
                 }
+            }
+        }
+
+        [HarmonyPatch(typeof(AmmonomiconPageRenderer), nameof(AmmonomiconPageRenderer.ConstructRectanglePageLayout), MethodType.Enumerator)]
+        public class ConstructRectanglePageLayoutPatch
+        {
+            [HarmonyPostfix]
+            public static void ConstructRectanglePageLayoutPostfix(ref bool __result, object __instance)
+            {
+                if (__result)
+                    return;
+
+                AmmonomiconPageRenderer self = GetFieldInEnumerator<AmmonomiconPageRenderer>(__instance, "this");
+                if (self == null)
+                    return;
+
+                if (self.pageType == AmmonomiconPageRenderer.PageType.EQUIPMENT_LEFT)
+                    BanSpriteController.UpdateBanSprites(self);
             }
         }
     }
