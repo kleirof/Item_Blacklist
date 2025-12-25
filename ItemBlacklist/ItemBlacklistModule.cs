@@ -10,17 +10,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
-using Alexandria.ItemAPI;
 
 namespace ItemBlacklist
 {
     [BepInDependency("etgmodding.etg.mtgapi")]
+    [BepInDependency("alexandria.etgmod.alexandria")]
     [BepInPlugin(GUID, NAME, VERSION)]
     public class ItemBlacklistModule : BaseUnityPlugin
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.6";
+        public const string VERSION = "1.0.7";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, WeakBag<AmmonomiconPokedexEntry>> ammonomiconDictionary = new Dictionary<string, WeakBag<AmmonomiconPokedexEntry>>();
