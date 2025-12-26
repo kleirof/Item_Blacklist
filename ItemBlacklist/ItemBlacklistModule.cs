@@ -10,17 +10,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using Gunfiguration;
 
 namespace ItemBlacklist
 {
     [BepInDependency("etgmodding.etg.mtgapi")]
     [BepInDependency("alexandria.etgmod.alexandria")]
+    [BepInDependency("pretzel.etg.gunfig")]
     [BepInPlugin(GUID, NAME, VERSION)]
     public class ItemBlacklistModule : BaseUnityPlugin
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.7";
+        public const string VERSION = "1.0.8";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, WeakBag<AmmonomiconPokedexEntry>> ammonomiconDictionary = new Dictionary<string, WeakBag<AmmonomiconPokedexEntry>>();
@@ -37,6 +39,11 @@ namespace ItemBlacklist
 
         private ConfigEntry<string> savePath;
         private string finalSavePath;
+
+        private Gunfig gunfig;
+
+        private const string RollIfBlacklistedOnStr = "Roll If Blacklisted";
+        internal bool rollIfBlacklisted = true;
 
         public void Start()
         {
@@ -60,6 +67,14 @@ namespace ItemBlacklist
             harmony.PatchAll();
 
             finalSavePath = ResolveSavePath(savePath.Value);
+
+            gunfig = Gunfig.Get("Item Blacklist".WithColor(Color.white));
+            gunfig.AddToggle(key: RollIfBlacklistedOnStr, label: GameManager.Options.CurrentLanguage == StringTableManager.GungeonSupportedLanguages.CHINESE ?
+                "重随机黑名单物品" :
+                RollIfBlacklistedOnStr, enabled: true, updateType: Gunfig.Update.OnConfirm,
+                callback: (optionKey, optionValue) => UpdateRollBlacklisted(optionValue));
+
+            UpdateRollBlacklisted();
 
             g.StartCoroutine(DelayInitialize());
         }
@@ -227,7 +242,8 @@ namespace ItemBlacklist
                 if (string.IsNullOrEmpty(entry.Key) || entry.Value == null)
                     continue;
                 blacklist.Add(entry.Key);
-                UpdateSavedEntry(entry.Value);
+                foreach (var pokedex in entry.Value)
+                    UpdateSavedEntry(entry.Key, pokedex);
             }
         }
 #endif
@@ -376,6 +392,28 @@ namespace ItemBlacklist
                 Debug.LogError($"Blacklist加载失败: {ex.Message} Blacklist load failed: {ex.Message}");
                 blacklist.Clear();
             }
+        }
+
+        internal static bool IsInBlacklist(PickupObject pickupObject)
+        {
+            if (pickupObject == null)
+                return false;
+
+            string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ??
+                          pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
+            if (string.IsNullOrEmpty(guid))
+                return false;
+
+            var blacklist = instance?.blacklist;
+            return blacklist != null && blacklist.Contains(guid);
+        }
+
+        private void UpdateRollBlacklisted(string value = null)
+        {
+            if (value == null)
+                value = gunfig.Value(RollIfBlacklistedOnStr);
+
+            rollIfBlacklisted = value == "1";
         }
 
         private void OnApplicationQuit()

@@ -74,11 +74,11 @@ namespace ItemBlacklist
 
             private static IEnumerator FlashPokedexEntry(AmmonomiconPokedexEntry pokedexEntry)
             {
-                if (pokedexEntry == null) 
+                if (pokedexEntry == null)
                     yield break;
 
                 dfSlicedSprite dfSlicedSprite = pokedexEntry?.transform?.Find("Sliced Sprite")?.GetComponent<dfSlicedSprite>();
-                if (dfSlicedSprite == null) 
+                if (dfSlicedSprite == null)
                     yield break;
 
                 var databaseEntry = pokedexEntry.linkedEncounterTrackable;
@@ -228,13 +228,7 @@ namespace ItemBlacklist
             {
                 if (pickupObject == null)
                     return orig;
-                string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
-                if (string.IsNullOrEmpty(guid))
-                    return orig;
-                var blacklist = ItemBlacklistModule.instance?.blacklist;
-                if (blacklist == null)
-                    return orig;
-                if (blacklist.Contains(guid))
+                if (ItemBlacklistModule.IsInBlacklist(pickupObject))
                     return false;
                 return orig;
             }
@@ -268,13 +262,7 @@ namespace ItemBlacklist
             {
                 if (pickupObject == null)
                     return orig;
-                string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
-                if (string.IsNullOrEmpty(guid))
-                    return orig;
-                var blacklist = ItemBlacklistModule.instance?.blacklist;
-                if (blacklist == null)
-                    return orig;
-                if (blacklist.Contains(guid))
+                if (ItemBlacklistModule.IsInBlacklist(pickupObject))
                     return false;
                 return orig;
             }
@@ -308,13 +296,7 @@ namespace ItemBlacklist
             {
                 if (pickupObject == null)
                     return orig;
-                string guid = pickupObject.encounterTrackable?.TrueEncounterGuid ?? pickupObject.GetComponent<EncounterTrackable>()?.TrueEncounterGuid;
-                if (string.IsNullOrEmpty(guid))
-                    return orig;
-                var blacklist = ItemBlacklistModule.instance?.blacklist;
-                if (blacklist == null)
-                    return orig;
-                if (blacklist.Contains(guid))
+                if (ItemBlacklistModule.IsInBlacklist(pickupObject))
                     return false;
                 return orig;
             }
@@ -461,6 +443,343 @@ namespace ItemBlacklist
 
                 if (self.pageType == AmmonomiconPageRenderer.PageType.EQUIPMENT_LEFT)
                     BanSpriteController.UpdateBanSprites(self);
+            }
+        }
+
+        [HarmonyPatch(typeof(PickupObjectDatabase), nameof(PickupObjectDatabase.GetRandomGun))]
+        public class GetRandomGunPatchClass
+        {
+            [HarmonyILManipulator]
+            public static void GetRandomGunPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (crs.TryGotoNext(MoveType.After,
+                    x => x.MatchIsinst<Gun>()
+                    ))
+                {
+                    crs.EmitCall<GetRandomGunPatchClass>(nameof(GetRandomGunPatchClass.GetRandomGunPatchCall));
+                }
+            }
+
+            private static Gun GetRandomGunPatchCall(Gun orig)
+            {
+                if (orig == null)
+                    return null;
+                if (ItemBlacklistModule.IsInBlacklist(orig))
+                    return null;
+                return orig;
+            }
+        }
+
+        [HarmonyPatch(typeof(PickupObjectDatabase), nameof(PickupObjectDatabase.GetRandomStartingGun))]
+        public class GetRandomStartingGunPatchClass
+        {
+            [HarmonyILManipulator]
+            public static void GetRandomStartingGunPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (crs.TryGotoNext(MoveType.After,
+                    x => x.MatchIsinst<Gun>()
+                    ))
+                {
+                    crs.EmitCall<GetRandomStartingGunPatchClass>(nameof(GetRandomStartingGunPatchClass.GetRandomStartingGunPatchCall));
+                }
+            }
+
+            private static Gun GetRandomStartingGunPatchCall(Gun orig)
+            {
+                if (orig == null)
+                    return null;
+                if (ItemBlacklistModule.IsInBlacklist(orig))
+                    return null;
+                return orig;
+            }
+        }
+
+        [HarmonyPatch(typeof(PickupObjectDatabase), nameof(PickupObjectDatabase.GetRandomGunOfQualities))]
+        public class GetRandomGunOfQualitiesPatchClass
+        {
+            [HarmonyILManipulator]
+            public static void GetRandomGunOfQualitiesPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (crs.TryGotoNext(MoveType.After,
+                    x => x.MatchIsinst<Gun>()
+                    ))
+                {
+                    crs.EmitCall<GetRandomGunOfQualitiesPatchClass>(nameof(GetRandomGunOfQualitiesPatchClass.GetRandomGunOfQualitiesPatchCall));
+                }
+            }
+
+            private static Gun GetRandomGunOfQualitiesPatchCall(Gun orig)
+            {
+                if (orig == null)
+                    return null;
+                if (ItemBlacklistModule.IsInBlacklist(orig))
+                    return null;
+                return orig;
+            }
+        }
+
+        [HarmonyPatch(typeof(PickupObjectDatabase), nameof(PickupObjectDatabase.GetRandomPassiveOfQualities))]
+        public class GetRandomPassiveOfQualitiesPatchClass
+        {
+            [HarmonyILManipulator]
+            public static void GetRandomPassiveOfQualitiesPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (crs.TryGotoNext(MoveType.After,
+                    x => x.MatchIsinst<PassiveItem>()
+                    ))
+                {
+                    crs.EmitCall<GetRandomPassiveOfQualitiesPatchClass>(nameof(GetRandomPassiveOfQualitiesPatchClass.GetRandomPassiveOfQualitiesPatchCall));
+                }
+            }
+
+            private static PassiveItem GetRandomPassiveOfQualitiesPatchCall(PassiveItem orig)
+            {
+                if (orig == null)
+                    return null;
+                if (ItemBlacklistModule.IsInBlacklist(orig))
+                    return null;
+                return orig;
+            }
+        }
+
+        [HarmonyPatch]
+        public class GetRandomActiveOfQualitiesPatch
+        {
+            [HarmonyTargetMethod]
+            public static MethodBase TargetMethod()
+            {
+                var qolConfigType = typeof(Gunfiguration.QoLConfig);
+
+                var nestedType = qolConfigType.GetNestedType("RandomizeParadoxEquipmentBetterPatch",
+                    BindingFlags.NonPublic | BindingFlags.Public);
+
+                if (nestedType == null)
+                {
+                    return null;
+                }
+
+                var method = nestedType.GetMethod("GetRandomActiveOfQualities",
+                    BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public,
+                    null,
+                    new Type[] { typeof(System.Random), typeof(PickupObject.ItemQuality[]) },
+                    null);
+
+                return method;
+            }
+
+            [HarmonyILManipulator]
+            public static void GetRandomPassiveOfQualitiesPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (crs.TryGotoNext(MoveType.After,
+                    x => x.MatchIsinst<PlayerItem>()
+                    ))
+                {
+                    crs.EmitCall<GetRandomActiveOfQualitiesPatch>(nameof(GetRandomActiveOfQualitiesPatch.GetRandomActiveOfQualitiesPatchCall));
+                }
+            }
+
+            private static PlayerItem GetRandomActiveOfQualitiesPatchCall(PlayerItem orig)
+            {
+                if (orig == null)
+                    return null;
+                if (ItemBlacklistModule.IsInBlacklist(orig))
+                    return null;
+                return orig;
+            }
+        }
+
+        [HarmonyPatch(typeof(LootEngine), nameof(LootEngine.DropItemWithoutInstantiating))]
+        [HarmonyPatch(typeof(LootEngine), nameof(LootEngine.SpawnItem))]
+        public class LootEnginePatch
+        {
+            private static void ReplaceIfBlacklisted(ref GameObject item)
+            {
+                if (ItemBlacklistModule.instance == null)
+                    return;
+                if (!ItemBlacklistModule.instance.rollIfBlacklisted)
+                    return;
+
+                var pickupObject = item.GetComponent<PickupObject>();
+                if (pickupObject == null)
+                    return;
+
+                if (!ItemBlacklistModule.IsInBlacklist(pickupObject))
+                    return;
+
+                PickupObject replacement = null;
+                var quality = pickupObject.quality;
+                int oldId = pickupObject.PickupObjectId; 
+                var localRandom = new System.Random(Environment.TickCount ^ oldId ^ UnityEngine.Random.Range(0, 65536));
+
+                for (int attempt = 0; attempt < 15; attempt++)
+                {
+                    if (pickupObject is PassiveItem)
+                    {
+                        replacement = PickupObjectDatabase.GetRandomPassiveOfQualities(
+                            localRandom,
+                            new List<int> { oldId },
+                            quality);
+                    }
+                    else if (pickupObject is Gun)
+                    {
+                        replacement = PickupObjectDatabase.GetRandomGunOfQualities(
+                            localRandom,
+                            new List<int> { oldId },
+                            quality);
+                    }
+                    else if (pickupObject is PlayerItem)
+                    {
+                        replacement = GetRandomActiveOfQualities(
+                            localRandom,
+                            new List<int> { oldId },
+                            quality);
+                    }
+
+                    if (replacement == null)
+                        break;
+
+                    if (!ItemBlacklistModule.IsInBlacklist(replacement))
+                        break;
+                    else
+                    {
+                        oldId = replacement.PickupObjectId;
+                        replacement = null;
+                    }
+                }
+
+                if (replacement != null)
+                {
+                    item = replacement.gameObject;
+                }
+            }
+
+            public static PlayerItem GetRandomActiveOfQualities(System.Random usedRandom, List<int> excludedIDs, params PickupObject.ItemQuality[] qualities)
+            {
+                List<PlayerItem> list = new List<PlayerItem>();
+                int totalChecked = 0;
+                int blacklistedCount = 0;
+
+                for (int i = 0; i < PickupObjectDatabase.Instance.Objects.Count; i++)
+                {
+                    var obj = PickupObjectDatabase.Instance.Objects[i];
+
+                    if (obj == null || !(obj is PlayerItem))
+                        continue;
+
+                    totalChecked++;
+
+                    if (ItemBlacklistModule.IsInBlacklist(obj))
+                    {
+                        blacklistedCount++;
+                        continue;
+                    }
+
+                    if (obj.quality == PickupObject.ItemQuality.EXCLUDED ||
+                        obj.quality == PickupObject.ItemQuality.SPECIAL)
+                        continue;
+
+                    if (obj is ContentTeaserItem)
+                        continue;
+
+                    if (Array.IndexOf(qualities, obj.quality) == -1)
+                        continue;
+
+                    if (excludedIDs != null && excludedIDs.Contains(obj.PickupObjectId))
+                        continue;
+
+                    EncounterTrackable component = obj.GetComponent<EncounterTrackable>();
+                    if (component && component.PrerequisitesMet())
+                    {
+                        list.Add(obj as PlayerItem);
+                    }
+                }
+
+                if (list.Count == 0)
+                {
+                    return null;
+                }
+
+                int num = usedRandom.Next(list.Count);
+                var result = list[num];
+
+                return result;
+            }
+
+            [HarmonyPrefix, HarmonyPatch(nameof(LootEngine.DropItemWithoutInstantiating))]
+            public static void DropItemWithoutInstantiatingPrefix(ref GameObject item)
+            {
+                ReplaceIfBlacklisted(ref item);
+            }
+
+            [HarmonyPrefix, HarmonyPatch(nameof(LootEngine.SpawnItem))]
+            public static void SpawnItemPrefix(ref GameObject item)
+            {
+                ReplaceIfBlacklisted(ref item);
+            }
+        }
+
+        [HarmonyPatch]
+        public class GetItemOfTypeAndQualityPatchClass
+        {
+            static MethodBase TargetMethod()
+            {
+                MethodInfo method = typeof(LootEngine).GetMethod("GetItemOfTypeAndQuality");
+                return method.MakeGenericMethod(typeof(PickupObject));
+            }
+
+            [HarmonyILManipulator]
+            public static void GetItemOfTypeAndQualityPatch(ILContext ctx)
+            {
+                ILCursor crs = new ILCursor(ctx);
+
+                if (crs.TryGotoNext(MoveType.After,
+                    x => x.MatchCallvirt<PickupObject>("PrerequisitesMet")
+                    ))
+                {
+                    crs.Emit(OpCodes.Ldloc_2);
+                    crs.Emit(OpCodes.Ldloc_1);
+                    crs.EmitCall<GetItemOfTypeAndQualityPatchClass>(nameof(GetItemOfTypeAndQualityPatchClass.GetItemOfTypeAndQualityPatchCall_1));
+                }
+                crs.Index = 0;
+
+                if (((Func<bool>)(() =>
+                    crs.TryGotoNext(MoveType.After,
+                    x => x.MatchCallvirt<PickupObject>("PrerequisitesMet")
+                    ))).TheNthTime(2))
+                {
+                    crs.Emit(OpCodes.Ldloc_S, (byte)6);
+                    crs.EmitCall<GetItemOfTypeAndQualityPatchClass>(nameof(GetItemOfTypeAndQualityPatchClass.GetItemOfTypeAndQualityPatchCall_2));
+                }
+            }
+
+            private static bool GetItemOfTypeAndQualityPatchCall_1(bool orig, int i, List<WeightedGameObject> compiledRawItems)
+            {
+                var pickupObject = compiledRawItems?[i]?.gameObject?.GetComponent<PickupObject>();
+                if (pickupObject == null)
+                    return orig;
+                if (ItemBlacklistModule.IsInBlacklist(pickupObject))
+                    return false;
+                return orig;
+            }
+
+            private static bool GetItemOfTypeAndQualityPatchCall_2(bool orig, int j)
+            {
+                var pickupObject = PickupObjectDatabase.Instance?.Objects[j];
+                if (pickupObject == null)
+                    return orig;
+                if (ItemBlacklistModule.IsInBlacklist(pickupObject))
+                    return false;
+                return orig;
             }
         }
     }

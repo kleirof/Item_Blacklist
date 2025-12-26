@@ -50,6 +50,9 @@
     <Reference Include="BepInEx, Version=5.4.21.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\BepInEx.BaseLib.5.4.21\lib\net35\BepInEx.dll</HintPath>
     </Reference>
+    <Reference Include="Gunfig, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\EtG.Gunfiguration.1.1.0\lib\net35\Gunfig.dll</HintPath>
+    </Reference>
     <Reference Include="ModTheGungeonAPI, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\EtG.ModTheGungeonAPI.1.9.0\lib\net35\ModTheGungeonAPI.dll</HintPath>
     </Reference>
