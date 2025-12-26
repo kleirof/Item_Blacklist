@@ -598,10 +598,15 @@ namespace ItemBlacklist
             }
         }
 
-        [HarmonyPatch(typeof(LootEngine), nameof(LootEngine.DropItemWithoutInstantiating))]
         [HarmonyPatch(typeof(LootEngine), nameof(LootEngine.SpawnItem))]
         public class LootEnginePatch
         {
+            [HarmonyPrefix]
+            public static void SpawnItemPrefix(ref GameObject item)
+            {
+                ReplaceIfBlacklisted(ref item);
+            }
+
             private static void ReplaceIfBlacklisted(ref GameObject item)
             {
                 if (ItemBlacklistModule.instance == null)
@@ -713,18 +718,6 @@ namespace ItemBlacklist
                 var result = list[num];
 
                 return result;
-            }
-
-            [HarmonyPrefix, HarmonyPatch(nameof(LootEngine.DropItemWithoutInstantiating))]
-            public static void DropItemWithoutInstantiatingPrefix(ref GameObject item)
-            {
-                ReplaceIfBlacklisted(ref item);
-            }
-
-            [HarmonyPrefix, HarmonyPatch(nameof(LootEngine.SpawnItem))]
-            public static void SpawnItemPrefix(ref GameObject item)
-            {
-                ReplaceIfBlacklisted(ref item);
             }
         }
 

@@ -22,7 +22,7 @@ namespace ItemBlacklist
     {
         public const string GUID = "kleirof.etg.itemblacklist";
         public const string NAME = "Item Blacklist";
-        public const string VERSION = "1.0.8";
+        public const string VERSION = "1.0.9";
         public const string TEXT_COLOR = "#AD8CFE";
 
         internal Dictionary<string, WeakBag<AmmonomiconPokedexEntry>> ammonomiconDictionary = new Dictionary<string, WeakBag<AmmonomiconPokedexEntry>>();
